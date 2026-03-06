@@ -1,0 +1,259 @@
+// HRForge Prisma Schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Tenancy & Auth
+model Tenant {
+  id              String    @id @default(uuid())
+  name            String
+  slug            String    @unique
+  logoUrl         String?
+  industry        String?
+  companySize     String?
+  timezone        String    @default("UTC")
+  dateFormat      String    @default("YYYY-MM-DD")
+  fiscalYearStart Int       @default(1)
+  status          String    @default("active")
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  users           User[]
+  roles           Role[]
+  departments     Department[]
+  locations       Location[]
+  employees       Employee[]
+  subscriptions   Subscription[]
+  auditLogs       AuditLog[]
+}
+
+model User {
+  id               String    @id @default(uuid())
+  email            String    @unique
+  password         String
+  firstName        String
+  lastName         String
+  isActive         Boolean   @default(true)
+  
+  // MFA fields
+  mfaSecret        String?   // Encrypted TOTP secret
+  mfaEnabled       Boolean   @default(false)
+  mfaBackupCodes   String[]  // Hashed backup codes
+  
+  // Email verification
+  emailVerified    Boolean   @default(false)
+  emailVerifyToken String?
+  
+  // Password reset
+  passwordResetToken   String?
+  passwordResetExpires DateTime?
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  roleId    String
+  role      Role     @relation(fields: [roleId], references: [id])
+
+  userRoles     UserRole[]
+  refreshTokens RefreshToken[]
+}
+
+model Role {
+  id          String     @id @default(uuid())
+  name        String
+  description String?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  tenantId    String
+  tenant      Tenant     @relation(fields: [tenantId], references: [id])
+  
+  users       User[]
+  userRoles   UserRole[]
+  rolePermissions RolePermission[]
+}
+
+model Permission {
+  id          String     @id @default(uuid())
+  key         String     @unique
+  name        String
+  description String?
+  createdAt   DateTime   @default(now())
+  
+  rolePermissions RolePermission[]
+}
+
+model RolePermission {
+  roleId       String
+  role         Role       @relation(fields: [roleId], references: [id])
+  permissionId String
+  permission   Permission @relation(fields: [permissionId], references: [id])
+
+  @@id([roleId, permissionId])
+}
+
+model UserRole {
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+  roleId String
+  role   Role   @relation(fields: [roleId], references: [id])
+
+  @@id([userId, roleId])
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  revokedAt DateTime?
+  
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// Core HR
+model Department {
+  id          String     @id @default(uuid())
+  name        String
+  description String?
+  parentId    String?
+  parent      Department? @relation("DepartmentHierarchy", fields: [parentId], references: [id])
+  children    Department[] @relation("DepartmentHierarchy")
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  tenantId    String
+  tenant      Tenant     @relation(fields: [tenantId], references: [id])
+  
+  employees   Employee[]
+}
+
+model Location {
+  id          String   @id @default(uuid())
+  name        String
+  address     String?
+  city        String?
+  state       String?
+  country     String?
+  postalCode  String?
+  timezone    String   @default("UTC")
+  isHeadquarters Boolean @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  
+  employees   Employee[]
+}
+
+model Employee {
+  id            String   @id @default(uuid())
+  firstName     String
+  lastName      String
+  email         String   @unique
+  phone         String?
+  startDate     DateTime
+  endDate       DateTime?
+  employmentType String
+  jobTitle      String
+  salary        Float?
+  currency      String?  @default("USD")
+  status        String   @default("active")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  tenantId      String
+  tenant        Tenant     @relation(fields: [tenantId], references: [id])
+  departmentId  String?
+  department    Department? @relation(fields: [departmentId], references: [id])
+  locationId    String?
+  location      Location?   @relation(fields: [locationId], references: [id])
+  managerId     String?
+  manager       Employee?   @relation("EmployeeManager", fields: [managerId], references: [id])
+  directReports Employee[] @relation("EmployeeManager")
+}
+
+// Subscription & Billing
+model Plan {
+  id                String   @id @default(uuid())
+  name              String   @unique
+  slug              String   @unique
+  description       String?
+  price             Float
+  interval          String   @default("month")
+  stripePriceId     String?  // Stripe Price ID
+  maxEmployees      Int?
+  maxJobs           Int?
+  maxCourses        Int?
+  features          Json
+  isActive          Boolean  @default(true)
+  isPopular         Boolean  @default(false)
+  displayOrder      Int      @default(0)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  planFeatures      PlanFeature[]
+  subscriptions     Subscription[]
+}
+
+model PlanFeature {
+  id          String   @id @default(uuid())
+  featureKey  String
+  name        String
+  description String?
+  limit       Int?     // null = unlimited
+  isEnabled   Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  planId      String
+  plan        Plan     @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  @@unique([planId, featureKey])
+}
+
+model Subscription {
+  id                   String   @id @default(uuid())
+  status               String   @default("trialing") // trialing, active, past_due, canceled, incomplete
+  stripeSubscriptionId String?  @unique
+  stripeCustomerId     String?
+  currentPeriodStart   DateTime
+  currentPeriodEnd     DateTime
+  trialStart           DateTime?
+  trialEnd             DateTime?
+  cancelAtPeriodEnd    Boolean  @default(false)
+  canceledAt           DateTime?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  tenantId             String   @unique
+  tenant               Tenant   @relation(fields: [tenantId], references: [id])
+  planId               String
+  plan                 Plan     @relation(fields: [planId], references: [id])
+}
+
+// Audit Log
+model AuditLog {
+  id        String   @id @default(uuid())
+  action    String
+  tableName String
+  recordId  String
+  oldValues Json?
+  newValues Json?
+  userId    String?
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  tenantId  String
+  tenant    Tenant @relation(fields: [tenantId], references: [id])
+}
