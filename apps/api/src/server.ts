@@ -12,6 +12,7 @@ import { mfaRouter } from './routes/mfa';
 import { employeesRouter } from './routes/employees';
 import { departmentsRouter } from './routes/departments';
 import { locationsRouter } from './routes/locations';
+import { webhooksRouter } from './routes/webhooks';
 import { initializeEventListeners } from './lib/events';
 
 // Load environment variables
@@ -32,6 +33,9 @@ app.use(cors({
   credentials: true
 }));
 app.use(rateLimiter);
+
+// Webhooks (must be before body parsers due to Express.raw needed for Stripe signature evaluation)
+app.use('/v1/webhooks', webhooksRouter);
 
 // Body Parsing Middleware
 app.use(express.json({ limit: '10mb' }));

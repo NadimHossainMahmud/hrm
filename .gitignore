@@ -52,3 +52,5 @@ __tests__/
 temp/
 
 /generated/prisma
+
+/cookies
