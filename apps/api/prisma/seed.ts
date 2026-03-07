@@ -41,7 +41,14 @@ async function main() {
     // Settings
     { key: 'settings.read', name: 'View Settings', description: 'Can view settings' },
     { key: 'settings.write', name: 'Manage Settings', description: 'Can manage settings' },
-    
+
+    // Notifications (Phase 4)
+    { key: 'notifications.read', name: 'View Notifications', description: 'Can view and manage notification preferences' },
+
+    // Workflows (Phase 4)
+    { key: 'workflows.read', name: 'View Workflows', description: 'Can view workflow templates and pending approvals' },
+    { key: 'workflows.write', name: 'Manage Workflows', description: 'Can create workflows and approve/reject requests' },
+
     // Super admin
     { key: 'super_admin', name: 'Super Admin', description: 'Full system access' },
   ];
@@ -76,33 +83,37 @@ async function main() {
     {
       name: 'super_admin',
       description: 'Full system access across all tenants',
-      permissions: ['super_admin', 'tenants.read', 'tenants.write', 'users.read', 'users.write', 
+      permissions: ['super_admin', 'tenants.read', 'tenants.write', 'users.read', 'users.write',
                      'roles.read', 'roles.write', 'employees.read', 'employees.write',
                      'departments.read', 'departments.write', 'locations.read', 'locations.write',
-                     'billing.read', 'billing.write', 'reports.read', 'settings.read', 'settings.write']
+                     'billing.read', 'billing.write', 'reports.read', 'settings.read', 'settings.write',
+                     'notifications.read', 'workflows.read', 'workflows.write']
     },
     {
       name: 'admin',
       description: 'Full access within their tenant',
       permissions: ['users.read', 'users.write', 'employees.read', 'employees.write',
                      'departments.read', 'departments.write', 'locations.read', 'locations.write',
-                     'billing.read', 'billing.write', 'reports.read', 'settings.read', 'settings.write']
+                     'billing.read', 'billing.write', 'reports.read', 'settings.read', 'settings.write',
+                     'notifications.read', 'workflows.read', 'workflows.write']
     },
     {
       name: 'hr_manager',
       description: 'HR management access',
       permissions: ['employees.read', 'employees.write', 'departments.read', 'departments.write',
-                     'locations.read', 'reports.read', 'settings.read']
+                     'locations.read', 'reports.read', 'settings.read',
+                     'notifications.read', 'workflows.read', 'workflows.write']
     },
     {
       name: 'manager',
       description: 'Manager access - can view team information',
-      permissions: ['employees.read', 'departments.read', 'locations.read']
+      permissions: ['employees.read', 'departments.read', 'locations.read',
+                     'notifications.read', 'workflows.read', 'workflows.write']
     },
     {
       name: 'employee',
       description: 'Basic employee access',
-      permissions: ['employees.read']
+      permissions: ['employees.read', 'notifications.read', 'workflows.read']
     }
   ];
   

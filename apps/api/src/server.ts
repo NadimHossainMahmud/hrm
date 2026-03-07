@@ -1,3 +1,4 @@
+import http from 'http';
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -13,7 +14,14 @@ import { employeesRouter } from './routes/employees';
 import { departmentsRouter } from './routes/departments';
 import { locationsRouter } from './routes/locations';
 import { webhooksRouter } from './routes/webhooks';
+import { billingRouter } from './routes/billing';
+import { notificationsRouter } from './routes/notifications';
+import { workflowsRouter } from './routes/workflows';
+import { hiringRouter } from './routes/hiring';
+import { careersPublicRouter } from './routes/careers-public';
 import { initializeEventListeners } from './lib/events';
+import { initSocket } from './lib/socket';
+import { startEmailWorker } from './jobs/email.job';
 
 // Load environment variables
 dotenv.config();
@@ -49,6 +57,11 @@ app.use('/v1/mfa', mfaRouter);
 app.use('/v1/employees', employeesRouter);
 app.use('/v1/departments', departmentsRouter);
 app.use('/v1/locations', locationsRouter);
+app.use('/v1/billing', billingRouter);
+app.use('/v1/notifications', notificationsRouter);
+app.use('/v1/workflows', workflowsRouter);
+app.use('/v1/public/careers', careersPublicRouter);
+app.use('/v1', hiringRouter);
 
 // 404 Handler
 app.use('*', (req, res) => {
@@ -61,10 +74,30 @@ app.use('*', (req, res) => {
 // Error Handler (must be last)
 app.use(errorHandler);
 
-// Start server
+// Start server with HTTP server for Socket.io (Phase 4)
 if (require.main === module) {
-  app.listen(PORT, () => {
+  const httpServer = http.createServer(app);
+  initSocket(httpServer);
+
+  // Start background job workers (Phase 4)
+  let emailWorker: ReturnType<typeof startEmailWorker> | null = null;
+  try {
+    emailWorker = startEmailWorker();
+  } catch (err) {
+    logger.warn('Email worker not started (Redis may be unavailable)', { err });
+  }
+
+  httpServer.listen(PORT, () => {
     logger.info(`🚀 Server running on port ${PORT}`);
     logger.info(`📚 API Documentation: http://localhost:${PORT}/health`);
   });
+
+  const shutdown = () => {
+    logger.info('Shutting down...');
+    emailWorker?.close();
+    httpServer.close();
+    process.exit(0);
+  };
+  process.on('SIGTERM', shutdown);
+  process.on('SIGINT', shutdown);
 }

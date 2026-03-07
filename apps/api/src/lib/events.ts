@@ -20,6 +20,9 @@ export enum AuditEventType {
   EMPLOYEE_DELETED = 'employee:deleted',
 }
 
+// Phase 4: Real-time notification event (consumed by Socket.io)
+export const NOTIFICATION_CREATED = 'notification:created';
+
 // Type for JSON values in audit logs
 type JsonValue = string | number | boolean | null | { [key: string]: JsonValue } | JsonValue[];
 
